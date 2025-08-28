@@ -11,12 +11,29 @@ export class PhaseMachine {
     },
 
     menu: async () => {
-        this.tower.init();
+      
+      
+      this.tower.init()
+        await new Promise<void>((resolve) => {
+            const onClick = () => {
+              document.removeEventListener("pointerdown", onClick);
+              resolve();
+            };
+    
+            document.addEventListener("pointerdown", onClick);
+          });
         return "move";
     },
 
     move: async () => {
-
+        await new Promise<void>((resolve) => {
+            const onClick = () => {
+              document.removeEventListener("pointerdown", onClick);
+              resolve();
+            };
+    
+            document.addEventListener("pointerdown", onClick);
+          });
         return "stop";
     },
 
