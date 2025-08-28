@@ -26,6 +26,7 @@ export class PhaseMachine {
     },
 
     move: async () => {
+      this.tower.addSlab();
         await new Promise<void>((resolve) => {
             const onClick = () => {
               document.removeEventListener("pointerdown", onClick);
@@ -38,7 +39,7 @@ export class PhaseMachine {
     },
 
     stop: async () => {
-
+      this.tower.stopSlab();
       return "place";
     },
     place: async () => {
