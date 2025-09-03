@@ -8,6 +8,8 @@ let SLAB_DEPTH = 5 * SLAB_HEIGHT;
 let SLAB_INDEX = 1;
 let TOP_X = 0;
 let TOP_Z = 0;
+let axis: 'x' | 'z' = 'z';
+
 export class Tower {
     private scene: THREE.Scene;
     private camera: THREE.PerspectiveCamera;
@@ -22,7 +24,7 @@ export class Tower {
         //Box
         const geometry = new THREE.BoxGeometry(SLAB_WIDTH, SLAB_HEIGHT, SLAB_DEPTH)
         const material = new THREE.MeshStandardMaterial({
-            color: getStackColor('love',SLAB_INDEX),
+            color: getStackColor('love', SLAB_INDEX),
             roughness: 0.7,
             metalness: 0.3
         })
@@ -46,12 +48,12 @@ export class Tower {
         this.camera = new THREE.PerspectiveCamera(60, sizes.width / sizes.height, 0.1, 1000)
         this.camera.position.set(50, 70, 50)
         this.scene.add(this.camera)
-        this.camera.lookAt(0,0,0)
+        this.camera.lookAt(0, 0, 0)
 
         // Axis Helper
 
-        const axesHelper = new THREE.AxesHelper( 50 );
-        this.scene.add( axesHelper );
+        const axesHelper = new THREE.AxesHelper(50);
+        this.scene.add(axesHelper);
 
         // Renderer
         const renderer = new THREE.WebGLRenderer({
@@ -103,23 +105,35 @@ export class Tower {
 
         animate.bind(this)()
     }
-    cutCurrentSlab(){
-        let leftSlabX = Math.max(-SLAB_WIDTH/2 + TOP_X, -SLAB_WIDTH/2 + this.currentSlab.position.x);
-        let rightSlabX = Math.min(SLAB_WIDTH/2 + TOP_X, SLAB_WIDTH/2 + this.currentSlab.position.x);
-        let middleSlabX = (rightSlabX+leftSlabX)/2
-        let newWidth = rightSlabX-leftSlabX;
-        console.log(rightSlabX-leftSlabX)
-        console.log(middleSlabX)
+    cutCurrentSlab() {
+        if (axis === "x"){
+        let leftSlabX = Math.max(-SLAB_WIDTH / 2 + TOP_X, -SLAB_WIDTH / 2 + this.currentSlab.position.x);
+        let rightSlabX = Math.min(SLAB_WIDTH / 2 + TOP_X, SLAB_WIDTH / 2 + this.currentSlab.position.x);
+        let middleSlabX = (rightSlabX + leftSlabX) / 2
+        let newWidth = rightSlabX - leftSlabX;
         this.currentSlab.geometry = new THREE.BoxGeometry(newWidth, SLAB_HEIGHT, SLAB_DEPTH)
         this.currentSlab.position.x = middleSlabX;
         TOP_X = middleSlabX;
         SLAB_WIDTH = newWidth;
+    }else{
+        let leftSlabZ = Math.max(-SLAB_DEPTH / 2 + TOP_Z, -SLAB_DEPTH / 2 + this.currentSlab.position.z);
+        let rightSlabZ= Math.min(SLAB_DEPTH / 2 + TOP_Z, SLAB_DEPTH / 2 + this.currentSlab.position.z);
+        let middleSlabZ = (rightSlabZ + leftSlabZ) / 2
+        let newDepth = rightSlabZ - leftSlabZ;
+        this.currentSlab.geometry = new THREE.BoxGeometry(SLAB_WIDTH, SLAB_HEIGHT, newDepth)
+        this.currentSlab.position.z = middleSlabZ;
+        TOP_Z = middleSlabZ;
+        SLAB_DEPTH = newDepth;
+        }
     }
-    addSlab(){
+    addSlab() {
+        if(axis==='x') axis='z'
+        else axis='x';
+
         SLAB_INDEX++;
         const geometry = new THREE.BoxGeometry(SLAB_WIDTH, SLAB_HEIGHT, SLAB_DEPTH)
         const material = new THREE.MeshStandardMaterial({
-            color: getStackColor('love',SLAB_INDEX),
+            color: getStackColor('love', SLAB_INDEX),
             roughness: 0.7,
             metalness: 0.3
         })
@@ -127,20 +141,25 @@ export class Tower {
         this.scene.add(slab)
         this.currentSlab = slab;
         slab.translateY(SLAB_INDEX * SLAB_HEIGHT - SLAB_HEIGHT);
-        gsap.from(slab.position,{x:-50})
+
+        slab.position.x = TOP_X;
+        slab.position.z = TOP_Z;
+        
+        if(axis==='x') gsap.from(slab.position, { x: -50})
+        else gsap.from(slab.position, { z: -50});
         gsap.to(slab.position, {
             duration: 3,
-            x: 50, 
             repeat: -1,
-            yoyo: true
+            yoyo: true,
+            ... (axis === 'x' ? { x: 50 } : { z: 50 })
         })
         gsap.to(this.camera.position, {
             duration: 1,
-            y: this.camera.position.y + SLAB_HEIGHT, 
+            y: this.camera.position.y + SLAB_HEIGHT,
             ease: 'power2.out'
         })
     }
-    stopSlab(){
+    stopSlab() {
         gsap.killTweensOf(this.currentSlab.position)
     }
     constructor() {
