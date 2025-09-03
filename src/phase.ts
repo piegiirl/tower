@@ -11,8 +11,6 @@ export class PhaseMachine {
     },
 
     menu: async () => {
-      
-      
       this.tower.init()
         await new Promise<void>((resolve) => {
             const onClick = () => {
@@ -43,7 +41,7 @@ export class PhaseMachine {
       return "place";
     },
     place: async () => {
-
+        this.tower.cutCurrentSlab();
         return "move";
       },
   };

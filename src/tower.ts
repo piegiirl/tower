@@ -3,9 +3,11 @@ import * as THREE from "three"
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { getStackColor } from "./utils/color";
 const SLAB_HEIGHT = 5;
-const SLAB_WIDTH = 5 * SLAB_HEIGHT;
-const SLAB_DEPTH = 5 * SLAB_HEIGHT;
+let SLAB_WIDTH = 5 * SLAB_HEIGHT;
+let SLAB_DEPTH = 5 * SLAB_HEIGHT;
 let SLAB_INDEX = 1;
+let TOP_X = 0;
+let TOP_Z = 0;
 export class Tower {
     private scene: THREE.Scene;
     private camera: THREE.PerspectiveCamera;
@@ -17,7 +19,7 @@ export class Tower {
         // Scene
         this.scene = new THREE.Scene()
 
-        // Green Box
+        //Box
         const geometry = new THREE.BoxGeometry(SLAB_WIDTH, SLAB_HEIGHT, SLAB_DEPTH)
         const material = new THREE.MeshStandardMaterial({
             color: getStackColor('love',SLAB_INDEX),
@@ -42,8 +44,14 @@ export class Tower {
 
         // Camera
         this.camera = new THREE.PerspectiveCamera(60, sizes.width / sizes.height, 0.1, 1000)
-        this.camera.position.set(50, 20, 20)
+        this.camera.position.set(50, 70, 50)
         this.scene.add(this.camera)
+        this.camera.lookAt(0,0,0)
+
+        // Axis Helper
+
+        const axesHelper = new THREE.AxesHelper( 50 );
+        this.scene.add( axesHelper );
 
         // Renderer
         const renderer = new THREE.WebGLRenderer({
@@ -59,10 +67,10 @@ export class Tower {
         renderer.shadowMap.enabled = true
         renderer.shadowMap.type = THREE.PCFSoftShadowMap
 
-        // Controls
-        const controls = new OrbitControls(this.camera, renderer.domElement)
-        controls.enableDamping = true
-        controls.dampingFactor = 0.05
+        // // Controls
+        // const controls = new OrbitControls(this.camera, renderer.domElement)
+        // controls.enableDamping = true
+        // controls.dampingFactor = 0.05
 
         // Clock for consistent animations
         const clock = new THREE.Clock()
@@ -72,7 +80,7 @@ export class Tower {
             const elapsedTime = clock.getElapsedTime()
 
             // Update controls
-            controls.update()
+            //controls.update()
 
             renderer.render(this.scene, this.camera)
             requestAnimationFrame(animate.bind(this))
@@ -94,7 +102,18 @@ export class Tower {
         })
 
         animate.bind(this)()
-
+    }
+    cutCurrentSlab(){
+        let leftSlabX = Math.max(-SLAB_WIDTH/2 + TOP_X, -SLAB_WIDTH/2 + this.currentSlab.position.x);
+        let rightSlabX = Math.min(SLAB_WIDTH/2 + TOP_X, SLAB_WIDTH/2 + this.currentSlab.position.x);
+        let middleSlabX = (rightSlabX+leftSlabX)/2
+        let newWidth = rightSlabX-leftSlabX;
+        console.log(rightSlabX-leftSlabX)
+        console.log(middleSlabX)
+        this.currentSlab.geometry = new THREE.BoxGeometry(newWidth, SLAB_HEIGHT, SLAB_DEPTH)
+        this.currentSlab.position.x = middleSlabX;
+        TOP_X = middleSlabX;
+        SLAB_WIDTH = newWidth;
     }
     addSlab(){
         SLAB_INDEX++;
@@ -114,6 +133,11 @@ export class Tower {
             x: 50, 
             repeat: -1,
             yoyo: true
+        })
+        gsap.to(this.camera.position, {
+            duration: 1,
+            y: this.camera.position.y + SLAB_HEIGHT, 
+            ease: 'power2.out'
         })
     }
     stopSlab(){
