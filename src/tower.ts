@@ -2,6 +2,7 @@ import { gsap } from "gsap";
 import * as THREE from "three"
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { getStackColor } from "./utils/color";
+import { Sky } from "three/examples/jsm/Addons.js";
 const SLAB_HEIGHT = 5;
 let SLAB_WIDTH = 5 * SLAB_HEIGHT;
 let SLAB_DEPTH = 5 * SLAB_HEIGHT;
@@ -20,6 +21,16 @@ export class Tower {
 
         // Scene
         this.scene = new THREE.Scene()
+        const sky = new Sky();
+sky.scale.setScalar( 4500 );
+
+const phi = THREE.MathUtils.degToRad( 90 );
+const theta = THREE.MathUtils.degToRad( 180 );
+const sunPosition = new THREE.Vector3().setFromSphericalCoords( 1, phi, theta );
+
+sky.material.uniforms.sunPosition.value = sunPosition;
+
+this.scene.add( sky );
 
         //Box
         const geometry = new THREE.BoxGeometry(SLAB_WIDTH, SLAB_HEIGHT, SLAB_DEPTH)
