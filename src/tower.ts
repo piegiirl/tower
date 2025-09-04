@@ -22,15 +22,17 @@ export class Tower {
         // Scene
         this.scene = new THREE.Scene()
         const sky = new Sky();
-sky.scale.setScalar( 4500 );
+        sky.scale.setScalar(3000);
 
-const phi = THREE.MathUtils.degToRad( 90 );
-const theta = THREE.MathUtils.degToRad( 180 );
-const sunPosition = new THREE.Vector3().setFromSphericalCoords( 1, phi, theta );
+        const phi = THREE.MathUtils.degToRad(90);
+        const theta = THREE.MathUtils.degToRad(180);
+        const sunPosition = new THREE.Vector3().setFromSphericalCoords(1, phi, theta);
+        sky.material.uniforms.turbidity.value = 0.9;
+        sky.material.uniforms.rayleigh.value = 0.2; 
+        sky.material.uniforms.mieDirectionalG.value = 0.9; 
+        sky.material.uniforms.sunPosition.value = sunPosition;
 
-sky.material.uniforms.sunPosition.value = sunPosition;
-
-this.scene.add( sky );
+        this.scene.add(sky);
 
         //Box
         const geometry = new THREE.BoxGeometry(SLAB_WIDTH, SLAB_HEIGHT, SLAB_DEPTH)
@@ -43,10 +45,10 @@ this.scene.add( sky );
         this.scene.add(slab)
 
         // Lights
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7)
         this.scene.add(ambientLight)
 
-        const mainLight = new THREE.DirectionalLight(0xffffff, 1)
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1.4)
         this.scene.add(mainLight)
 
         // Sizes
@@ -69,8 +71,10 @@ this.scene.add( sky );
         // Renderer
         const renderer = new THREE.WebGLRenderer({
             canvas: canvas,
-            antialias: true
+            antialias: true,
+            alpha: true
         })
+        renderer.setClearColor(0x000000, 0);
         renderer.setSize(sizes.width, sizes.height)
         renderer.toneMapping = THREE.ACESFilmicToneMapping
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -117,29 +121,29 @@ this.scene.add( sky );
         animate.bind(this)()
     }
     cutCurrentSlab() {
-        if (axis === "x"){
-        let leftSlabX = Math.max(-SLAB_WIDTH / 2 + TOP_X, -SLAB_WIDTH / 2 + this.currentSlab.position.x);
-        let rightSlabX = Math.min(SLAB_WIDTH / 2 + TOP_X, SLAB_WIDTH / 2 + this.currentSlab.position.x);
-        let middleSlabX = (rightSlabX + leftSlabX) / 2
-        let newWidth = rightSlabX - leftSlabX;
-        this.currentSlab.geometry = new THREE.BoxGeometry(newWidth, SLAB_HEIGHT, SLAB_DEPTH)
-        this.currentSlab.position.x = middleSlabX;
-        TOP_X = middleSlabX;
-        SLAB_WIDTH = newWidth;
-    }else{
-        let leftSlabZ = Math.max(-SLAB_DEPTH / 2 + TOP_Z, -SLAB_DEPTH / 2 + this.currentSlab.position.z);
-        let rightSlabZ= Math.min(SLAB_DEPTH / 2 + TOP_Z, SLAB_DEPTH / 2 + this.currentSlab.position.z);
-        let middleSlabZ = (rightSlabZ + leftSlabZ) / 2
-        let newDepth = rightSlabZ - leftSlabZ;
-        this.currentSlab.geometry = new THREE.BoxGeometry(SLAB_WIDTH, SLAB_HEIGHT, newDepth)
-        this.currentSlab.position.z = middleSlabZ;
-        TOP_Z = middleSlabZ;
-        SLAB_DEPTH = newDepth;
+        if (axis === "x") {
+            let leftSlabX = Math.max(-SLAB_WIDTH / 2 + TOP_X, -SLAB_WIDTH / 2 + this.currentSlab.position.x);
+            let rightSlabX = Math.min(SLAB_WIDTH / 2 + TOP_X, SLAB_WIDTH / 2 + this.currentSlab.position.x);
+            let middleSlabX = (rightSlabX + leftSlabX) / 2
+            let newWidth = rightSlabX - leftSlabX;
+            this.currentSlab.geometry = new THREE.BoxGeometry(newWidth, SLAB_HEIGHT, SLAB_DEPTH)
+            this.currentSlab.position.x = middleSlabX;
+            TOP_X = middleSlabX;
+            SLAB_WIDTH = newWidth;
+        } else {
+            let leftSlabZ = Math.max(-SLAB_DEPTH / 2 + TOP_Z, -SLAB_DEPTH / 2 + this.currentSlab.position.z);
+            let rightSlabZ = Math.min(SLAB_DEPTH / 2 + TOP_Z, SLAB_DEPTH / 2 + this.currentSlab.position.z);
+            let middleSlabZ = (rightSlabZ + leftSlabZ) / 2
+            let newDepth = rightSlabZ - leftSlabZ;
+            this.currentSlab.geometry = new THREE.BoxGeometry(SLAB_WIDTH, SLAB_HEIGHT, newDepth)
+            this.currentSlab.position.z = middleSlabZ;
+            TOP_Z = middleSlabZ;
+            SLAB_DEPTH = newDepth;
         }
     }
     addSlab() {
-        if(axis==='x') axis='z'
-        else axis='x';
+        if (axis === 'x') axis = 'z'
+        else axis = 'x';
 
         SLAB_INDEX++;
         const geometry = new THREE.BoxGeometry(SLAB_WIDTH, SLAB_HEIGHT, SLAB_DEPTH)
@@ -155,9 +159,9 @@ this.scene.add( sky );
 
         slab.position.x = TOP_X;
         slab.position.z = TOP_Z;
-        
-        if(axis==='x') gsap.from(slab.position, { x: -50})
-        else gsap.from(slab.position, { z: -50});
+
+        if (axis === 'x') gsap.from(slab.position, { x: -50 })
+        else gsap.from(slab.position, { z: -50 });
         gsap.to(slab.position, {
             duration: 3,
             repeat: -1,
