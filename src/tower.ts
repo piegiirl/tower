@@ -3,6 +3,8 @@ import * as THREE from "three"
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { getStackColor } from "./utils/color";
 import { Sky } from "three/examples/jsm/Addons.js";
+import * as CANNON from 'cannon-es';
+
 const SLAB_HEIGHT = 5;
 let SLAB_WIDTH = 5 * SLAB_HEIGHT;
 let SLAB_DEPTH = 5 * SLAB_HEIGHT;
@@ -14,7 +16,11 @@ let seed = 0;
 export class Tower {
     private scene: THREE.Scene;
     private camera: THREE.PerspectiveCamera;
+    private renderer: THREE.WebGLRenderer;
+    private clock: THREE.Clock;
     private currentSlab: THREE.Mesh;
+    private world: CANNON.World;
+    private bodies: {mesh: THREE.Mesh, body: CANNON.Body}[] = [];
     public SLAB_INDEX = 1;
     public init() {
 
@@ -50,8 +56,30 @@ export class Tower {
             roughness: 0.7,
             metalness: 0.3
         })
-        const slab = new THREE.Mesh(geometry, material as unknown as THREE.MeshBasicMaterial)
+        const slab = new THREE.Mesh(geometry, material)
         this.scene.add(slab)
+
+        // Create physics body for base slab
+        this.world = new CANNON.World();
+        this.world.gravity.set(0, -100, 0);
+        this.world.broadphase = new CANNON.NaiveBroadphase();
+        // this.world.solver.iterations = 10;
+
+        // Optional ground plane
+        // const groundShape = new CANNON.Plane();
+        // const groundBody = new CANNON.Body({ mass: 0 });
+        // groundBody.addShape(groundShape);
+        // groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+        // groundBody.position.set(0, -SLAB_HEIGHT / 2 - 1, 0); // Slightly below the base
+        // this.world.addBody(groundBody);
+
+        const baseShape = new CANNON.Box(new CANNON.Vec3(SLAB_WIDTH / 2, SLAB_HEIGHT / 2, SLAB_DEPTH / 2));
+        const baseBody = new CANNON.Body({ mass: 0 });
+        baseBody.addShape(baseShape);
+        baseBody.position.copy(new CANNON.Vec3(slab.position.x,slab.position.y,slab.position.z));
+        baseBody.quaternion.copy(new CANNON.Quaternion(slab.quaternion.x,slab.quaternion.y,slab.quaternion.z));
+        this.world.addBody(baseBody);
+        this.bodies.push({ mesh: slab, body: baseBody });
 
         // Lights
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.7)
@@ -78,20 +106,20 @@ export class Tower {
         this.scene.add(axesHelper);
 
         // Renderer
-        const renderer = new THREE.WebGLRenderer({
+        this.renderer = new THREE.WebGLRenderer({
             canvas: canvas,
             antialias: true,
             alpha: true
         })
-        renderer.setClearColor(0x000000, 0);
-        renderer.setSize(sizes.width, sizes.height)
-        renderer.toneMapping = THREE.ACESFilmicToneMapping
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-        //renderer.outputEncoding = THREE.sRGBEncoding
+        this.renderer.setClearColor(0x000000, 0);
+        this.renderer.setSize(sizes.width, sizes.height)
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+        //this.renderer.outputEncoding = THREE.sRGBEncoding
 
         // Add shadow support
-        renderer.shadowMap.enabled = true
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap
+        this.renderer.shadowMap.enabled = true
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
 
         // // Controls
         // const controls = new OrbitControls(this.camera, renderer.domElement)
@@ -99,17 +127,25 @@ export class Tower {
         // controls.dampingFactor = 0.05
 
         // Clock for consistent animations
-        const clock = new THREE.Clock()
+        this.clock = new THREE.Clock()
 
         // Animate
-        function animate() {
-            const elapsedTime = clock.getElapsedTime()
+        const animate = () => {
+            const delta = this.clock.getDelta();
+            this.world.step(1 / 60, delta, 3);
+
+            for (const { mesh, body } of this.bodies) {
+                if (body.mass > 0) {
+                    mesh.position.copy(body.position);
+                    mesh.quaternion.copy(body.quaternion);
+                }
+            }
 
             // Update controls
             //controls.update()
 
-            renderer.render(this.scene, this.camera)
-            requestAnimationFrame(animate.bind(this))
+            this.renderer.render(this.scene, this.camera)
+            requestAnimationFrame(animate)
         }
 
         // Handle Resize
@@ -123,40 +159,150 @@ export class Tower {
             this.camera.updateProjectionMatrix()
 
             // Update renderer
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-            renderer.setSize(sizes.width, sizes.height)
+            this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+            this.renderer.setSize(sizes.width, sizes.height)
         })
 
-        animate.bind(this)()
+        animate()
     }
     cutCurrentSlab(): boolean {
+        let success = true;
         if (axis === "x") {
-            if (-SLAB_WIDTH / 2 + TOP_X > SLAB_WIDTH / 2 + this.currentSlab.position.x) return false;
-            if (SLAB_WIDTH / 2 + TOP_X < -SLAB_WIDTH / 2 + this.currentSlab.position.x) return false;
+            const prevLeft = -SLAB_WIDTH / 2 + TOP_X;
+            const prevRight = SLAB_WIDTH / 2 + TOP_X;
+            const currLeft = -SLAB_WIDTH / 2 + this.currentSlab.position.x;
+            const currRight = SLAB_WIDTH / 2 + this.currentSlab.position.x;
+            const overlapLeft = Math.max(prevLeft, currLeft);
+            const overlapRight = Math.min(prevRight, currRight);
 
-            let leftSlabX = Math.max(-SLAB_WIDTH / 2 + TOP_X, -SLAB_WIDTH / 2 + this.currentSlab.position.x);
-            let rightSlabX = Math.min(SLAB_WIDTH / 2 + TOP_X, SLAB_WIDTH / 2 + this.currentSlab.position.x);
-            let middleSlabX = (rightSlabX + leftSlabX) / 2
-            let newWidth = rightSlabX - leftSlabX;
+            if (overlapLeft >= overlapRight) return false;
+
+            // Create left cutoff if exists
+            if (currLeft < overlapLeft) {
+                const cutoffWidth = overlapLeft - currLeft;
+                const cutoffGeom = new THREE.BoxGeometry(cutoffWidth, SLAB_HEIGHT, SLAB_DEPTH);
+                const cutoffMat = (this.currentSlab.material as THREE.Material).clone();
+                const cutoffMesh = new THREE.Mesh(cutoffGeom, cutoffMat);
+                cutoffMesh.position.set(
+                    (currLeft + overlapLeft) / 2,
+                    this.currentSlab.position.y,
+                    this.currentSlab.position.z
+                );
+                this.scene.add(cutoffMesh);
+
+                // Physics for cutoff
+                const cutoffShape = new CANNON.Box(new CANNON.Vec3(cutoffWidth / 2, SLAB_HEIGHT / 2, SLAB_DEPTH / 2));
+                const cutoffBody = new CANNON.Body({ mass: 10 });
+                cutoffBody.addShape(cutoffShape);
+                cutoffBody.position.copy(new CANNON.Vec3(cutoffMesh.position.x,cutoffMesh.position.y,cutoffMesh.position.z));
+                cutoffBody.quaternion.copy(new CANNON.Quaternion(cutoffMesh.quaternion.x,cutoffMesh.quaternion.y,cutoffMesh.quaternion.z));
+                this.world.addBody(cutoffBody);
+                this.bodies.push({ mesh: cutoffMesh, body: cutoffBody });
+            }
+
+            // Create right cutoff if exists
+            if (currRight > overlapRight) {
+                const cutoffWidth = currRight - overlapRight;
+                const cutoffGeom = new THREE.BoxGeometry(cutoffWidth, SLAB_HEIGHT, SLAB_DEPTH);
+                const cutoffMat = (this.currentSlab.material as THREE.Material).clone();
+                const cutoffMesh = new THREE.Mesh(cutoffGeom, cutoffMat);
+                cutoffMesh.position.set(
+                    (overlapRight + currRight) / 2,
+                    this.currentSlab.position.y,
+                    this.currentSlab.position.z
+                );
+                this.scene.add(cutoffMesh);
+
+                // Physics for cutoff
+                const cutoffShape = new CANNON.Box(new CANNON.Vec3(cutoffWidth / 2, SLAB_HEIGHT / 2, SLAB_DEPTH / 2));
+                const cutoffBody = new CANNON.Body({ mass: 10 });
+                cutoffBody.addShape(cutoffShape);
+                cutoffBody.position.copy(new CANNON.Vec3(cutoffMesh.position.x,cutoffMesh.position.y,cutoffMesh.position.z));
+                cutoffBody.quaternion.copy(new CANNON.Quaternion(cutoffMesh.quaternion.x,cutoffMesh.quaternion.y,cutoffMesh.quaternion.z));
+                this.world.addBody(cutoffBody);
+                this.bodies.push({ mesh: cutoffMesh, body: cutoffBody });
+            }
+
+            // Update current slab to overlap
+            const newWidth = overlapRight - overlapLeft;
             this.currentSlab.geometry = new THREE.BoxGeometry(newWidth, SLAB_HEIGHT, SLAB_DEPTH)
-            this.currentSlab.position.x = middleSlabX;
-            TOP_X = middleSlabX;
+            this.currentSlab.position.x = (overlapLeft + overlapRight) / 2;
+            TOP_X = this.currentSlab.position.x;
             SLAB_WIDTH = newWidth;
-            return true;
         } else {
-            if(-SLAB_DEPTH / 2 + TOP_Z > SLAB_DEPTH / 2 + this.currentSlab.position.z) return false;
-            if(SLAB_DEPTH / 2 + TOP_Z < -SLAB_DEPTH / 2 + this.currentSlab.position.z) return false;
+            const prevBottom = -SLAB_DEPTH / 2 + TOP_Z;
+            const prevTop = SLAB_DEPTH / 2 + TOP_Z;
+            const currBottom = -SLAB_DEPTH / 2 + this.currentSlab.position.z;
+            const currTop = SLAB_DEPTH / 2 + this.currentSlab.position.z;
+            const overlapBottom = Math.max(prevBottom, currBottom);
+            const overlapTop = Math.min(prevTop, currTop);
 
-            let leftSlabZ = Math.max(-SLAB_DEPTH / 2 + TOP_Z, -SLAB_DEPTH / 2 + this.currentSlab.position.z);
-            let rightSlabZ = Math.min(SLAB_DEPTH / 2 + TOP_Z, SLAB_DEPTH / 2 + this.currentSlab.position.z);
-            let middleSlabZ = (rightSlabZ + leftSlabZ) / 2
-            let newDepth = rightSlabZ - leftSlabZ;
+            if (overlapBottom >= overlapTop) return false;
+
+            // Create bottom cutoff if exists (analogous to left)
+            if (currBottom < overlapBottom) {
+                const cutoffDepth = overlapBottom - currBottom;
+                const cutoffGeom = new THREE.BoxGeometry(SLAB_WIDTH, SLAB_HEIGHT, cutoffDepth);
+                const cutoffMat = (this.currentSlab.material as THREE.Material).clone();
+                const cutoffMesh = new THREE.Mesh(cutoffGeom, cutoffMat);
+                cutoffMesh.position.set(
+                    this.currentSlab.position.x,
+                    this.currentSlab.position.y,
+                    (currBottom + overlapBottom) / 2
+                );
+                this.scene.add(cutoffMesh);
+
+                // Physics for cutoff
+                const cutoffShape = new CANNON.Box(new CANNON.Vec3(SLAB_WIDTH / 2, SLAB_HEIGHT / 2, cutoffDepth / 2));
+                const cutoffBody = new CANNON.Body({ mass: 10 });
+                cutoffBody.addShape(cutoffShape);
+                cutoffBody.position.copy(new CANNON.Vec3(cutoffMesh.position.x,cutoffMesh.position.y,cutoffMesh.position.z));
+                cutoffBody.quaternion.copy(new CANNON.Quaternion(cutoffMesh.quaternion.x,cutoffMesh.quaternion.y,cutoffMesh.quaternion.z));
+                this.world.addBody(cutoffBody);
+                this.bodies.push({ mesh: cutoffMesh, body: cutoffBody });
+            }
+
+            // Create top cutoff if exists (analogous to right)
+            if (currTop > overlapTop) {
+                const cutoffDepth = currTop - overlapTop;
+                const cutoffGeom = new THREE.BoxGeometry(SLAB_WIDTH, SLAB_HEIGHT, cutoffDepth);
+                const cutoffMat = (this.currentSlab.material as THREE.Material).clone();
+                const cutoffMesh = new THREE.Mesh(cutoffGeom, cutoffMat);
+                cutoffMesh.position.set(
+                    this.currentSlab.position.x,
+                    this.currentSlab.position.y,
+                    (overlapTop + currTop) / 2
+                );
+                this.scene.add(cutoffMesh);
+
+                // Physics for cutoff
+                const cutoffShape = new CANNON.Box(new CANNON.Vec3(SLAB_WIDTH / 2, SLAB_HEIGHT / 2, cutoffDepth / 2));
+                const cutoffBody = new CANNON.Body({ mass: 10 });
+                cutoffBody.addShape(cutoffShape);
+                cutoffBody.position.copy(new CANNON.Vec3(cutoffMesh.position.x,cutoffMesh.position.y,cutoffMesh.position.z));
+                cutoffBody.quaternion.copy(new CANNON.Quaternion(cutoffMesh.quaternion.x,cutoffMesh.quaternion.y,cutoffMesh.quaternion.z));
+                this.world.addBody(cutoffBody);
+                this.bodies.push({ mesh: cutoffMesh, body: cutoffBody });
+            }
+
+            // Update current slab to overlap
+            const newDepth = overlapTop - overlapBottom;
             this.currentSlab.geometry = new THREE.BoxGeometry(SLAB_WIDTH, SLAB_HEIGHT, newDepth)
-            this.currentSlab.position.z = middleSlabZ;
-            TOP_Z = middleSlabZ;
+            this.currentSlab.position.z = (overlapBottom + overlapTop) / 2;
+            TOP_Z = this.currentSlab.position.z;
             SLAB_DEPTH = newDepth;
-            return true;
         }
+
+        // Add static body for the placed slab
+        const shape = new CANNON.Box(new CANNON.Vec3(SLAB_WIDTH / 2, SLAB_HEIGHT / 2, SLAB_DEPTH / 2));
+        const body = new CANNON.Body({ mass: 0 });
+        body.addShape(shape);
+        body.position.copy(new CANNON.Vec3(this.currentSlab.position.x,this.currentSlab.position.y,this.currentSlab.position.z));
+        body.quaternion.copy(new CANNON.Quaternion(this.currentSlab.quaternion.x,this.currentSlab.quaternion.y,this.currentSlab.quaternion.z));
+        this.world.addBody(body);
+        this.bodies.push({ mesh: this.currentSlab, body });
+
+        return true;
     }
     addSlab() {
         if (axis === 'x') axis = 'z'
@@ -169,10 +315,10 @@ export class Tower {
             roughness: 0.7,
             metalness: 0.3
         })
-        const slab = new THREE.Mesh(geometry, material as unknown as THREE.MeshBasicMaterial)
+        const slab = new THREE.Mesh(geometry, material)
         this.scene.add(slab)
         this.currentSlab = slab;
-        slab.translateY(this.SLAB_INDEX * SLAB_HEIGHT - SLAB_HEIGHT);
+        slab.position.y = this.SLAB_INDEX * SLAB_HEIGHT - SLAB_HEIGHT;
 
         slab.position.x = TOP_X;
         slab.position.z = TOP_Z;
@@ -180,9 +326,10 @@ export class Tower {
         if (axis === 'x') gsap.from(slab.position, { x: -50 })
         else gsap.from(slab.position, { z: -50 });
         gsap.to(slab.position, {
-            duration: 3,
+            duration: 1.75,
             repeat: -1,
             yoyo: true,
+            ease: 'linear',
             ... (axis === 'x' ? { x: 50 } : { z: 50 })
         })
         gsap.to(this.camera.position, {
