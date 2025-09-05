@@ -24,6 +24,7 @@ export class PhaseMachine {
     },
 
     move: async () => {
+      this.tower.updateScore();
       this.tower.addSlab();
         await new Promise<void>((resolve) => {
             const onClick = () => {
@@ -41,9 +42,13 @@ export class PhaseMachine {
       return "place";
     },
     place: async () => {
-        this.tower.cutCurrentSlab();
-        return "move";
+        if (this.tower.cutCurrentSlab()) return "move";
+        return 'lose'
       },
+
+    lose: async () => {
+      return 'menu'
+    }
   };
 
   constructor() {

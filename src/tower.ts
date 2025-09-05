@@ -6,16 +6,25 @@ import { Sky } from "three/examples/jsm/Addons.js";
 const SLAB_HEIGHT = 5;
 let SLAB_WIDTH = 5 * SLAB_HEIGHT;
 let SLAB_DEPTH = 5 * SLAB_HEIGHT;
-let SLAB_INDEX = 1;
+
 let TOP_X = 0;
 let TOP_Z = 0;
 let axis: 'x' | 'z' = 'z';
-
+let seed = 0;
 export class Tower {
     private scene: THREE.Scene;
     private camera: THREE.PerspectiveCamera;
     private currentSlab: THREE.Mesh;
+    public SLAB_INDEX = 1;
     public init() {
+
+        SLAB_WIDTH = 5 * SLAB_HEIGHT;
+        SLAB_DEPTH = 5 * SLAB_HEIGHT;
+        this.SLAB_INDEX = 1;
+        TOP_X = 0;
+        TOP_Z = 0;
+        axis = 'z';
+        seed = Math.floor(Math.random()*1000)
         // Canvas
         const canvas = document.querySelector("canvas.webgl") as HTMLCanvasElement;
 
@@ -28,8 +37,8 @@ export class Tower {
         const theta = THREE.MathUtils.degToRad(180);
         const sunPosition = new THREE.Vector3().setFromSphericalCoords(1, phi, theta);
         sky.material.uniforms.turbidity.value = 0.9;
-        sky.material.uniforms.rayleigh.value = 0.2; 
-        sky.material.uniforms.mieDirectionalG.value = 0.9; 
+        sky.material.uniforms.rayleigh.value = 0.2;
+        sky.material.uniforms.mieDirectionalG.value = 0.9;
         sky.material.uniforms.sunPosition.value = sunPosition;
 
         this.scene.add(sky);
@@ -37,7 +46,7 @@ export class Tower {
         //Box
         const geometry = new THREE.BoxGeometry(SLAB_WIDTH, SLAB_HEIGHT, SLAB_DEPTH)
         const material = new THREE.MeshStandardMaterial({
-            color: getStackColor('love', SLAB_INDEX),
+            color: getStackColor(seed, this.SLAB_INDEX),
             roughness: 0.7,
             metalness: 0.3
         })
@@ -120,8 +129,11 @@ export class Tower {
 
         animate.bind(this)()
     }
-    cutCurrentSlab() {
+    cutCurrentSlab(): boolean {
         if (axis === "x") {
+            if (-SLAB_WIDTH / 2 + TOP_X > SLAB_WIDTH / 2 + this.currentSlab.position.x) return false;
+            if (SLAB_WIDTH / 2 + TOP_X < -SLAB_WIDTH / 2 + this.currentSlab.position.x) return false;
+
             let leftSlabX = Math.max(-SLAB_WIDTH / 2 + TOP_X, -SLAB_WIDTH / 2 + this.currentSlab.position.x);
             let rightSlabX = Math.min(SLAB_WIDTH / 2 + TOP_X, SLAB_WIDTH / 2 + this.currentSlab.position.x);
             let middleSlabX = (rightSlabX + leftSlabX) / 2
@@ -130,7 +142,11 @@ export class Tower {
             this.currentSlab.position.x = middleSlabX;
             TOP_X = middleSlabX;
             SLAB_WIDTH = newWidth;
+            return true;
         } else {
+            if(-SLAB_DEPTH / 2 + TOP_Z > SLAB_DEPTH / 2 + this.currentSlab.position.z) return false;
+            if(SLAB_DEPTH / 2 + TOP_Z < -SLAB_DEPTH / 2 + this.currentSlab.position.z) return false;
+
             let leftSlabZ = Math.max(-SLAB_DEPTH / 2 + TOP_Z, -SLAB_DEPTH / 2 + this.currentSlab.position.z);
             let rightSlabZ = Math.min(SLAB_DEPTH / 2 + TOP_Z, SLAB_DEPTH / 2 + this.currentSlab.position.z);
             let middleSlabZ = (rightSlabZ + leftSlabZ) / 2
@@ -139,23 +155,24 @@ export class Tower {
             this.currentSlab.position.z = middleSlabZ;
             TOP_Z = middleSlabZ;
             SLAB_DEPTH = newDepth;
+            return true;
         }
     }
     addSlab() {
         if (axis === 'x') axis = 'z'
         else axis = 'x';
 
-        SLAB_INDEX++;
+        this.SLAB_INDEX++;
         const geometry = new THREE.BoxGeometry(SLAB_WIDTH, SLAB_HEIGHT, SLAB_DEPTH)
         const material = new THREE.MeshStandardMaterial({
-            color: getStackColor('love', SLAB_INDEX),
+            color: getStackColor(seed, this.SLAB_INDEX),
             roughness: 0.7,
             metalness: 0.3
         })
         const slab = new THREE.Mesh(geometry, material as unknown as THREE.MeshBasicMaterial)
         this.scene.add(slab)
         this.currentSlab = slab;
-        slab.translateY(SLAB_INDEX * SLAB_HEIGHT - SLAB_HEIGHT);
+        slab.translateY(this.SLAB_INDEX * SLAB_HEIGHT - SLAB_HEIGHT);
 
         slab.position.x = TOP_X;
         slab.position.z = TOP_Z;
@@ -176,6 +193,9 @@ export class Tower {
     }
     stopSlab() {
         gsap.killTweensOf(this.currentSlab.position)
+    }
+    updateScore(){
+        document.getElementById("text")!.innerText = this.SLAB_INDEX.toString();
     }
     constructor() {
     }
