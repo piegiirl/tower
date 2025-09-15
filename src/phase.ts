@@ -1,10 +1,12 @@
 import { Tower } from "./tower";
 import type { Phase, PhaseHandler } from "./types";
+import { endGame, restartGame } from "./utils/modal";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export class PhaseMachine {
-    private tower = new Tower(); 
+  private modal = document.getElementById("gameOverModal");
+  private tower = new Tower(); 
   private phases: Record<Phase, PhaseHandler> = {
     start: async () => {
       return "menu";
@@ -46,10 +48,19 @@ export class PhaseMachine {
         return 'lose'
       },
 
-    lose: async () => {
-      return 'menu'
-    }
-  };
+      lose: async (): Promise<string> => {
+        if (this.modal) {
+          endGame("loss", this.modal);
+          await new Promise<void>((resolve) => {
+            (window as any).restartGame = () => {
+              restartGame(this.modal);
+              resolve();
+            };
+          });
+        }
+        return "menu";
+      },
+    };
 
   constructor() {
     this.execute("start");

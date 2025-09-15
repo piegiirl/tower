@@ -8,6 +8,24 @@
     <link rel="stylesheet" href="./src/css/index.css" />
 </head>
 <body>
+    <div id="gameOverModal" class="modal">
+        <div class="modal-content">
+          <h2>Игра окончена!</h2>
+          <p>Вы проиграли. Попробуйте снова!</p>
+          <p1>Нажмите для продолжения</p1>
+        </div>
+      </div>
+    
+      <script>
+const modal = document.getElementById("gameOverModal");
+  if (modal) {
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) {
+        window.restartGame(); // Вызываем restartGame
+      }
+    });
+  }
+      </script>
 	<div id="root">
     <div id="text"></div>
     <canvas id="canvas" class="webgl"></canvas>

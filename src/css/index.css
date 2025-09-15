@@ -21,27 +21,66 @@ body {
 }
 
 .text {
-    font-family: 'Roboto', Arial, sans-serif;
-    color: red;
+    font-family: Monospace;
     z-index: 1000;
     position: absolute;
-    top: 20px;
-    left: 20px;
+    top: 400px;
     background-color: rgba(0, 0, 0, 0.5); /* Добавляем фон для видимости */
     padding: 10px;
 }
 
 #text {
+    font-family: 'FreeMono', monospace;
     position: absolute;
-    top: 10px;
+    color:#ffffff;
     width: 100%;
     text-align: center;
     z-index: 100;
     display:block;
 	font-family: 'Inter';
+    top: 20px;
+    font-size: 3rem;
 }
 
 #root {
     width: 100vw;
     height: 100vh;
 }
+.modal {
+    display: none; /* Скрыто по умолчанию */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5); /* Полупрозрачный фон */
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+
+  .modal.show {
+    display: flex; /* Показать модальное окно */
+  }
+  h2 {
+    font-size: 4rem;
+    font-family: Monospace;
+    margin: 0 0 20px;
+    color: white;
+  }
+  p {
+    font-size: 2rem;
+    font-family: Monospace;
+    margin: 0 0 20px;
+    color: white;
+  }
+  p1 {
+    font-size: 2rem;
+    font-family: Monospace;
+    margin: 0 0 20px;
+    color: white;
+  }
+
+  button:hover {
+    background: #0056b3;
+  }
