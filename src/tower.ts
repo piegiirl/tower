@@ -1,8 +1,6 @@
 import { gsap } from "gsap";
 import * as THREE from "three";
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { getStackColor } from "./utils/color";
-import { Sky } from "three/examples/jsm/Addons.js";
 import * as CANNON from 'cannon-es';
 
 const SLAB_HEIGHT = 5;
@@ -155,9 +153,57 @@ canvas.style.background = `linear-gradient(90deg, ${color1}, ${color2})`;
             const currRight = SLAB_WIDTH / 2 + this.currentSlab.position.x;
             const overlapLeft = Math.max(prevLeft, currLeft);
             const overlapRight = Math.min(prevRight, currRight);
+            const offsetX = Math.abs(this.currentSlab.position.x - TOP_X);
+
 
             if (overlapLeft >= overlapRight) return false;
 
+            if (offsetX < 0.5){
+                // Snap к точной позиции
+            this.currentSlab.position.x = TOP_X;
+
+            // Создаём белый прямоугольник (плоскость)
+            const geometry = new THREE.PlaneGeometry(SLAB_WIDTH + 2, SLAB_DEPTH + 2);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0xffffff, // Белый цвет
+                transparent: true,
+                opacity: 0.8,
+                side: THREE.DoubleSide
+            });
+            const light = new THREE.Mesh(geometry, material);
+            light.position.set(TOP_X, this.currentSlab.position.y - SLAB_HEIGHT / 2 - 0.1, TOP_Z);
+            light.rotation.x = -Math.PI / 2; // Ложим плоскость горизонтально
+            this.scene.add(light);
+
+            // Анимация появления и исчезновения
+            gsap.fromTo(
+                light.material,
+                { opacity: 0 },
+                { opacity: 0.7, duration: 0.5, ease: 'power2.out' }
+            );
+            gsap.to(light.material, {
+                opacity: 0,
+                duration: 0.5,
+                delay: 0.5,
+                ease: 'power2.in',
+                onComplete: () => {
+                    this.scene.remove(light);
+                    light.geometry.dispose();
+                    light.material.dispose();
+                }
+            });
+
+
+            // Фиксируем плиту как static (без резки)
+            const shape = new CANNON.Box(new CANNON.Vec3(SLAB_WIDTH / 2, SLAB_HEIGHT / 2, SLAB_DEPTH / 2));
+            const body = new CANNON.Body({ mass: 0 });
+            body.addShape(shape);
+            body.position.copy(new CANNON.Vec3(this.currentSlab.position.x, this.currentSlab.position.y, this.currentSlab.position.z));
+            this.world.addBody(body);
+            this.bodies.push({ mesh: this.currentSlab, body });
+
+            return success;
+            }
             if (currLeft < overlapLeft) {
                 const cutoffWidth = overlapLeft - currLeft;
                 const cutoffGeom = new THREE.BoxGeometry(cutoffWidth, SLAB_HEIGHT, SLAB_DEPTH);
@@ -202,7 +248,51 @@ canvas.style.background = `linear-gradient(90deg, ${color1}, ${color2})`;
             const currTop = SLAB_DEPTH / 2 + this.currentSlab.position.z;
             const overlapBottom = Math.max(prevBottom, currBottom);
             const overlapTop = Math.min(prevTop, currTop);
+            const offsetZ = Math.abs(this.currentSlab.position.z - TOP_Z);
+            if ( offsetZ < 0.5){
+                // Snap к точной позиции
+            this.currentSlab.position.x = TOP_X;
 
+            // Создаём белый прямоугольник (плоскость)
+            const geometry = new THREE.PlaneGeometry(SLAB_WIDTH + 2, SLAB_DEPTH + 2);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0xffffff, // Белый цвет
+                transparent: true,
+                opacity: 0.8,
+                side: THREE.DoubleSide
+            });
+            const light = new THREE.Mesh(geometry, material);
+            light.position.set(TOP_X, this.currentSlab.position.y - SLAB_HEIGHT / 2 - 0.1, TOP_Z);
+            light.rotation.x = -Math.PI / 2; // Ложим плоскость горизонтально
+            this.scene.add(light);
+
+            // Анимация появления и исчезновения
+            gsap.fromTo(
+                light.material,
+                { opacity: 0 },
+                { opacity: 0.7, duration: 0.5, ease: 'power2.out' }
+            );
+            gsap.to(light.material, {
+                opacity: 0,
+                duration: 0.5,
+                delay: 0.5,
+                ease: 'power2.in',
+                onComplete: () => {
+                    this.scene.remove(light);
+                    light.geometry.dispose();
+                    light.material.dispose();
+                }
+            });
+            // Фиксируем плиту как static (без резки)
+            const shape = new CANNON.Box(new CANNON.Vec3(SLAB_WIDTH / 2, SLAB_HEIGHT / 2, SLAB_DEPTH / 2));
+            const body = new CANNON.Body({ mass: 0 });
+            body.addShape(shape);
+            body.position.copy(new CANNON.Vec3(this.currentSlab.position.x, this.currentSlab.position.y, this.currentSlab.position.z));
+            this.world.addBody(body);
+            this.bodies.push({ mesh: this.currentSlab, body });
+
+            return success;
+            }
             if (overlapBottom >= overlapTop) return false;
 
             if (currBottom < overlapBottom) {
