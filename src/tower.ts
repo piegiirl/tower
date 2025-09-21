@@ -2,6 +2,7 @@ import { gsap } from "gsap";
 import * as THREE from "three";
 import { getStackColor } from "./utils/color";
 import * as CANNON from 'cannon-es';
+import { Howl } from 'howler';
 
 const SLAB_HEIGHT = 5;
 let SLAB_WIDTH = 5 * SLAB_HEIGHT;
@@ -11,6 +12,7 @@ let TOP_X = 0;
 let TOP_Z = 0;
 let axis: 'x' | 'z' = 'z';
 let seed = 0;
+
 export class Tower {
     scene: THREE.Scene;
     camera: THREE.PerspectiveCamera;
@@ -30,6 +32,15 @@ export class Tower {
         '#FF7100',
         '#FF3900', 
     ];
+    private stackSound: Howl;
+
+    constructor() {
+        this.stackSound = new Howl({
+            src: ['/src/music.ogg'], 
+            volume: 0.3,
+        });
+        this.init();
+    }
 
     init() {
         SLAB_WIDTH = 5 * SLAB_HEIGHT;
@@ -46,15 +57,15 @@ export class Tower {
         // Scene
         this.scene = new THREE.Scene();
 
-// Установка CSS-градиента как фона
-const randomIndex1 = Math.floor(Math.random() * this.gradientColors.length);
-let randomIndex2 = Math.floor(Math.random() * this.gradientColors.length);
-while (randomIndex2 === randomIndex1) {
-    randomIndex2 = Math.floor(Math.random() * this.gradientColors.length);
-}
-const color1 = this.gradientColors[randomIndex1];
-const color2 = this.gradientColors[randomIndex2];
-canvas.style.background = `linear-gradient(90deg, ${color1}, ${color2})`;
+        // Установка CSS-градиента как фона
+        const randomIndex1 = Math.floor(Math.random() * this.gradientColors.length);
+        let randomIndex2 = Math.floor(Math.random() * this.gradientColors.length);
+        while (randomIndex2 === randomIndex1) {
+            randomIndex2 = Math.floor(Math.random() * this.gradientColors.length);
+        }
+        const color1 = this.gradientColors[randomIndex1];
+        const color2 = this.gradientColors[randomIndex2];
+        canvas.style.background = `linear-gradient(90deg, ${color1}, ${color2})`;
 
         // Box (базовая плита)
         const geometry = new THREE.BoxGeometry(SLAB_WIDTH, SLAB_HEIGHT, SLAB_DEPTH);
@@ -146,6 +157,10 @@ canvas.style.background = `linear-gradient(90deg, ${color1}, ${color2})`;
 
     cutCurrentSlab(): boolean {
         let success = true;
+        // Рассчитываем громкость для каждого размещения
+        const volume = Math.min(1.0, 0.3 + this.SLAB_INDEX * 0.02);
+        let rate = this.stackSound.rate(); // Сохраняем текущую высоту звука
+
         if (axis === "x") {
             const prevLeft = -SLAB_WIDTH / 2 + TOP_X;
             const prevRight = SLAB_WIDTH / 2 + TOP_X;
@@ -155,54 +170,65 @@ canvas.style.background = `linear-gradient(90deg, ${color1}, ${color2})`;
             const overlapRight = Math.min(prevRight, currRight);
             const offsetX = Math.abs(this.currentSlab.position.x - TOP_X);
 
+            if (overlapLeft >= overlapRight) {
+                // Воспроизведение звука при проигрыше
+                this.stackSound.volume(volume);
+                this.stackSound.play();
+                console.log('Playing sound, volume:', volume, 'rate:', rate, 'SLAB_INDEX:', this.SLAB_INDEX);
+                return false;
+            }
 
-            if (overlapLeft >= overlapRight) return false;
-
-            if (offsetX < 0.5){
+            if (offsetX < 0.5) {
                 // Snap к точной позиции
-            this.currentSlab.position.x = TOP_X;
+                this.currentSlab.position.x = TOP_X;
 
-            // Создаём белый прямоугольник (плоскость)
-            const geometry = new THREE.PlaneGeometry(SLAB_WIDTH + 2, SLAB_DEPTH + 2);
-            const material = new THREE.MeshBasicMaterial({
-                color: 0xffffff, // Белый цвет
-                transparent: true,
-                opacity: 0.8,
-                side: THREE.DoubleSide
-            });
-            const light = new THREE.Mesh(geometry, material);
-            light.position.set(TOP_X, this.currentSlab.position.y - SLAB_HEIGHT / 2 - 0.1, TOP_Z);
-            light.rotation.x = -Math.PI / 2; // Ложим плоскость горизонтально
-            this.scene.add(light);
+                // Создаём белый прямоугольник (плоскость)
+                const geometry = new THREE.PlaneGeometry(SLAB_WIDTH + 2, SLAB_DEPTH + 2);
+                const material = new THREE.MeshBasicMaterial({
+                    color: 0xffffff, // Белый цвет
+                    transparent: true,
+                    opacity: 0.8,
+                    side: THREE.DoubleSide
+                });
+                const light = new THREE.Mesh(geometry, material);
+                light.position.set(TOP_X, this.currentSlab.position.y - SLAB_HEIGHT / 2 - 0.1, TOP_Z);
+                light.rotation.x = -Math.PI / 2; // Ложим плоскость горизонтально
+                this.scene.add(light);
 
-            // Анимация появления и исчезновения
-            gsap.fromTo(
-                light.material,
-                { opacity: 0 },
-                { opacity: 0.7, duration: 0.5, ease: 'power2.out' }
-            );
-            gsap.to(light.material, {
-                opacity: 0,
-                duration: 0.5,
-                delay: 0.5,
-                ease: 'power2.in',
-                onComplete: () => {
-                    this.scene.remove(light);
-                    light.geometry.dispose();
-                    light.material.dispose();
-                }
-            });
+                // Анимация появления и исчезновения
+                gsap.fromTo(
+                    light.material,
+                    { opacity: 0 },
+                    { opacity: 0.7, duration: 0.5, ease: 'power2.out' }
+                );
+                gsap.to(light.material, {
+                    opacity: 0,
+                    duration: 0.5,
+                    delay: 0.5,
+                    ease: 'power2.in',
+                    onComplete: () => {
+                        this.scene.remove(light);
+                        light.geometry.dispose();
+                        light.material.dispose();
+                    }
+                });
 
+                // Увеличиваем высоту звука при точном совпадении (более плавно)
+                rate = Math.min(3.0, 1 + this.SLAB_INDEX * 0.02);
+                this.stackSound.volume(volume);
+                this.stackSound.rate(rate);
+                this.stackSound.play();
+                console.log('Playing sound (perfect match), volume:', volume, 'rate:', rate, 'SLAB_INDEX:', this.SLAB_INDEX);
 
-            // Фиксируем плиту как static (без резки)
-            const shape = new CANNON.Box(new CANNON.Vec3(SLAB_WIDTH / 2, SLAB_HEIGHT / 2, SLAB_DEPTH / 2));
-            const body = new CANNON.Body({ mass: 0 });
-            body.addShape(shape);
-            body.position.copy(new CANNON.Vec3(this.currentSlab.position.x, this.currentSlab.position.y, this.currentSlab.position.z));
-            this.world.addBody(body);
-            this.bodies.push({ mesh: this.currentSlab, body });
+                // Фиксируем плиту как static (без резки)
+                const shape = new CANNON.Box(new CANNON.Vec3(SLAB_WIDTH / 2, SLAB_HEIGHT / 2, SLAB_DEPTH / 2));
+                const body = new CANNON.Body({ mass: 0 });
+                body.addShape(shape);
+                body.position.copy(new CANNON.Vec3(this.currentSlab.position.x, this.currentSlab.position.y, this.currentSlab.position.z));
+                this.world.addBody(body);
+                this.bodies.push({ mesh: this.currentSlab, body });
 
-            return success;
+                return success;
             }
             if (currLeft < overlapLeft) {
                 const cutoffWidth = overlapLeft - currLeft;
@@ -241,6 +267,12 @@ canvas.style.background = `linear-gradient(90deg, ${color1}, ${color2})`;
             this.currentSlab.position.x = (overlapLeft + overlapRight) / 2;
             TOP_X = this.currentSlab.position.x;
             SLAB_WIDTH = newWidth;
+
+            // Воспроизведение звука при резке
+            this.stackSound.volume(volume);
+            this.stackSound.rate(rate);
+            this.stackSound.play();
+            console.log('Playing sound (cut), volume:', volume, 'rate:', rate, 'SLAB_INDEX:', this.SLAB_INDEX);
         } else {
             const prevBottom = -SLAB_DEPTH / 2 + TOP_Z;
             const prevTop = SLAB_DEPTH / 2 + TOP_Z;
@@ -249,52 +281,67 @@ canvas.style.background = `linear-gradient(90deg, ${color1}, ${color2})`;
             const overlapBottom = Math.max(prevBottom, currBottom);
             const overlapTop = Math.min(prevTop, currTop);
             const offsetZ = Math.abs(this.currentSlab.position.z - TOP_Z);
-            if ( offsetZ < 0.5){
-                // Snap к точной позиции
-            this.currentSlab.position.x = TOP_X;
 
-            // Создаём белый прямоугольник (плоскость)
-            const geometry = new THREE.PlaneGeometry(SLAB_WIDTH + 2, SLAB_DEPTH + 2);
-            const material = new THREE.MeshBasicMaterial({
-                color: 0xffffff, // Белый цвет
-                transparent: true,
-                opacity: 0.8,
-                side: THREE.DoubleSide
-            });
-            const light = new THREE.Mesh(geometry, material);
-            light.position.set(TOP_X, this.currentSlab.position.y - SLAB_HEIGHT / 2 - 0.1, TOP_Z);
-            light.rotation.x = -Math.PI / 2; // Ложим плоскость горизонтально
-            this.scene.add(light);
-
-            // Анимация появления и исчезновения
-            gsap.fromTo(
-                light.material,
-                { opacity: 0 },
-                { opacity: 0.7, duration: 0.5, ease: 'power2.out' }
-            );
-            gsap.to(light.material, {
-                opacity: 0,
-                duration: 0.5,
-                delay: 0.5,
-                ease: 'power2.in',
-                onComplete: () => {
-                    this.scene.remove(light);
-                    light.geometry.dispose();
-                    light.material.dispose();
-                }
-            });
-            // Фиксируем плиту как static (без резки)
-            const shape = new CANNON.Box(new CANNON.Vec3(SLAB_WIDTH / 2, SLAB_HEIGHT / 2, SLAB_DEPTH / 2));
-            const body = new CANNON.Body({ mass: 0 });
-            body.addShape(shape);
-            body.position.copy(new CANNON.Vec3(this.currentSlab.position.x, this.currentSlab.position.y, this.currentSlab.position.z));
-            this.world.addBody(body);
-            this.bodies.push({ mesh: this.currentSlab, body });
-
-            return success;
+            if (overlapBottom >= overlapTop) {
+                // Воспроизведение звука при проигрыше
+                this.stackSound.volume(volume);
+                this.stackSound.play();
+                console.log('Playing sound, volume:', volume, 'rate:', rate, 'SLAB_INDEX:', this.SLAB_INDEX);
+                return false;
             }
-            if (overlapBottom >= overlapTop) return false;
 
+            if (offsetZ < 0.5) {
+                // Snap к точной позиции
+                this.currentSlab.position.z = TOP_Z;
+
+                // Создаём белый прямоугольник (плоскость)
+                const geometry = new THREE.PlaneGeometry(SLAB_WIDTH + 2, SLAB_DEPTH + 2);
+                const material = new THREE.MeshBasicMaterial({
+                    color: 0xffffff, // Белый цвет
+                    transparent: true,
+                    opacity: 0.8,
+                    side: THREE.DoubleSide
+                });
+                const light = new THREE.Mesh(geometry, material);
+                light.position.set(TOP_X, this.currentSlab.position.y - SLAB_HEIGHT / 2 - 0.1, TOP_Z);
+                light.rotation.x = -Math.PI / 2; // Ложим плоскость горизонтально
+                this.scene.add(light);
+
+                // Анимация появления и исчезновения
+                gsap.fromTo(
+                    light.material,
+                    { opacity: 0 },
+                    { opacity: 0.7, duration: 0.5, ease: 'power2.out' }
+                );
+                gsap.to(light.material, {
+                    opacity: 0,
+                    duration: 0.5,
+                    delay: 0.5,
+                    ease: 'power2.in',
+                    onComplete: () => {
+                        this.scene.remove(light);
+                        light.geometry.dispose();
+                        light.material.dispose();
+                    }
+                });
+
+                // Увеличиваем высоту звука при точном совпадении (более плавно)
+                rate = Math.min(3.0, 1 + this.SLAB_INDEX * 0.02);
+                this.stackSound.volume(volume);
+                this.stackSound.rate(rate);
+                this.stackSound.play();
+                console.log('Playing sound (perfect match), volume:', volume, 'rate:', rate, 'SLAB_INDEX:', this.SLAB_INDEX);
+
+                // Фиксируем плиту как static (без резки)
+                const shape = new CANNON.Box(new CANNON.Vec3(SLAB_WIDTH / 2, SLAB_HEIGHT / 2, SLAB_DEPTH / 2));
+                const body = new CANNON.Body({ mass: 0 });
+                body.addShape(shape);
+                body.position.copy(new CANNON.Vec3(this.currentSlab.position.x, this.currentSlab.position.y, this.currentSlab.position.z));
+                this.world.addBody(body);
+                this.bodies.push({ mesh: this.currentSlab, body });
+
+                return success;
+            }
             if (currBottom < overlapBottom) {
                 const cutoffDepth = overlapBottom - currBottom;
                 const cutoffGeom = new THREE.BoxGeometry(SLAB_WIDTH, SLAB_HEIGHT, cutoffDepth);
@@ -332,6 +379,12 @@ canvas.style.background = `linear-gradient(90deg, ${color1}, ${color2})`;
             this.currentSlab.position.z = (overlapBottom + overlapTop) / 2;
             TOP_Z = this.currentSlab.position.z;
             SLAB_DEPTH = newDepth;
+
+            // Воспроизведение звука при резке
+            this.stackSound.volume(volume);
+            this.stackSound.rate(rate);
+            this.stackSound.play();
+            console.log('Playing sound (cut), volume:', volume, 'rate:', rate, 'SLAB_INDEX:', this.SLAB_INDEX);
         }
 
         const shape = new CANNON.Box(new CANNON.Vec3(SLAB_WIDTH / 2, SLAB_HEIGHT / 2, SLAB_DEPTH / 2));
@@ -384,9 +437,5 @@ canvas.style.background = `linear-gradient(90deg, ${color1}, ${color2})`;
 
     updateScore() {
         document.getElementById("text")!.innerText = this.SLAB_INDEX.toString();
-    }
-
-    constructor() {
-        this.init();
     }
 }
